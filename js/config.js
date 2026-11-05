@@ -1,7 +1,7 @@
 /* Análise ESE — configuração geral */
 var CONFIG = {
   SISTEMA: 'Análise ESE',
-  VERSAO: '0.1.0.0',
+  VERSAO: '0.1.0.1',
   DESENVOLVEDOR: 'Vettore Sistemas',
   CHAVE_LOCAL: 'analise-ese-config-v1'
 };
