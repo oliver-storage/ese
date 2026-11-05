@@ -148,3 +148,18 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--azul-claro)
   .tab th { position: static; }
 }
 @media (max-width: 700px) { .conteudo { padding: 12px 12px; } .miniaturas { grid-template-columns: 1fr; } }
+
+/* avaliação especializada */
+.grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 12px; }
+@media (max-width: 1100px) { .grid3 { grid-template-columns: 1fr; } }
+.chk { display: flex; gap: 7px; align-items: flex-start; font-size: 13px; padding: 3px 0; cursor: pointer; }
+.chk input { margin-top: 3px; }
+.sub-t { display: block; color: var(--azul-esc); font-size: 13px; margin-bottom: 6px; }
+.bloco-cl { border: 1px solid var(--borda); border-radius: 9px; padding: 10px 14px; }
+.bloco-cl p { margin: 6px 0; }
+.laudo-txt { min-height: 520px; font: 13px/1.55 ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+ul.pend { margin: 0; padding-left: 18px; color: #78350f; }
+ul.pend li { margin: 3px 0; }
+ol.bib { font-size: 12.5px; color: #334155; padding-left: 20px; margin: 0; }
+ol.bib li { margin: 4px 0; }
+#tabBolus input[type=number] { width: 64px; }

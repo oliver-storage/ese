@@ -1,7 +1,7 @@
 /* Análise ESE — configuração geral */
 var CONFIG = {
   SISTEMA: 'Análise ESE',
-  VERSAO: '0.1.0.1',
+  VERSAO: '0.2.0.0',
   DESENVOLVEDOR: 'Vettore Sistemas',
   CHAVE_LOCAL: 'analise-ese-config-v1'
 };
@@ -24,6 +24,7 @@ var PRESETS_REF = {
   'solid': {
     nome: 'Solid state — ManoView (Medtronic)',
     fonte: 'Template HROM, BSG (Medtronic ManoView)',
+    lvIrpMax: 8, lvIbpMax: null, lvRtMin: null, lvAusenteMax: null, lvBaixoMin: null, lvAltoMax: null,
     repousoMin: 34, repMedMin: null, repMedMax: null, repousoMax: 104, residualMax: 12,
     aberturaMin: 0.48, aberturaMax: 1.02,
     extMin: null, extMax: null, faringeMin: null, faringeMax: null,
@@ -32,6 +33,7 @@ var PRESETS_REF = {
   'perfusao': {
     nome: 'Perfusão — Multiplex/Alacer (Silva et al., 2018)',
     fonte: 'Arq Gastroenterol 2018 — p5–p95, 32 voluntários',
+    lvIrpMax: 8, lvIbpMax: null, lvRtMin: null, lvAusenteMax: null, lvBaixoMin: null, lvAltoMax: null,
     repousoMin: 16.7, repMedMin: null, repMedMax: null, repousoMax: 184.4, residualMax: 12,
     aberturaMin: null, aberturaMax: null,
     extMin: null, extMax: null, faringeMin: null, faringeMax: null,
@@ -40,6 +42,7 @@ var PRESETS_REF = {
   'estudo': {
     nome: 'Estudo ESE (este trabalho) — preencher com a casuística',
     fonte: 'Texto do trabalho: extensão 1,5–3,7 cm; abertura média 0,5 s',
+    lvIrpMax: 8, lvIbpMax: null, lvRtMin: null, lvAusenteMax: null, lvBaixoMin: null, lvAltoMax: null,
     repousoMin: 34, repMedMin: null, repMedMax: null, repousoMax: 104, residualMax: 12,
     aberturaMin: null, aberturaMax: null,
     extMin: 1.5, extMax: 3.7, faringeMin: null, faringeMax: null,
@@ -60,6 +63,8 @@ var CFG_PADRAO = {
   repIni: -3.0, repFim: -0.7,   // janela de repouso (s) relativa ao início da abertura
   farIni: -1.5, farFim: 1.0,    // janela da contração faríngea (s) relativa a início/fim da abertura
   posJanela: 2.5,               // janela pós-deglutição (s) após o fim da abertura
+  segHipo: 4, segMeso: 7, segVelo: 10, // cm acima do ápice do ESE: limites dos segmentos faríngeos
+  volUmidaPadrao: 5,            // mL atribuídos às deglutições úmidas marcadas no Multiplex
   limiarIntegral: 20,           // mmHg — pressão mínima somada nas integrais contráteis (convenção DCI)
   tolCoord: 0.10,               // s — tolerância da coordenação
   durMin: 0.10,                 // s — duração mínima da abertura

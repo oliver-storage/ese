@@ -27,7 +27,7 @@
   }
 
   /* ---------- navegação ---------- */
-  var TITULOS = { exame: 'Exame', sonda: 'Sonda e região de análise', comp: 'Compensação postural', analise: 'Análise das deglutições', laudo: 'Laudo e planilha', refs: 'Valores de referência', ajuda: 'Como usar' };
+  var TITULOS = { exame: 'Exame', sonda: 'Sonda e região de análise', comp: 'Compensação postural', analise: 'Análise das deglutições', laudo: 'Laudo e planilha', avaliacao: 'Avaliação especializada do ESE', refs: 'Valores de referência', ajuda: 'Como usar' };
   function irPara(pg) {
     E.pagina = pg;
     $$('.menu nav a').forEach(function (a) { a.classList.toggle('ativo', a.dataset.pg === pg); });
@@ -42,6 +42,7 @@
     if (p === 'comp') renderComp();
     if (p === 'analise') renderAnalise();
     if (p === 'laudo') renderLaudo();
+    if (p === 'avaliacao') Avaliacao.render(E);
     if (p === 'refs') renderRefs();
     if (p === 'ajuda') renderAjuda();
   }
@@ -51,7 +52,7 @@
     if (!arq) return;
     $('#subTopo').textContent = 'Lendo ' + arq.name + '…';
     Leitores.ler(arq).then(function (ex) {
-      E.ex = ex; E.manuais = []; E.ajustes = {}; E.selManual = {}; E.atual = -1;
+      E.ex = ex; E.manuais = []; E.ajustes = {}; E.selManual = {}; E.atual = -1; E.av = null;
       montarCanaisCfg();
       processar();
       ex.avisos.forEach(function (a) { toast(a); });
@@ -178,6 +179,9 @@
     ['intervaloMin', 'Intervalo mínimo entre deglutições', 's', 0.5, ''],
     ['intervaloSeq', 'Marcar como sequencial abaixo de', 's', 0.5, 'O protocolo pede ≥ 10 s entre deglutições.'],
     ['nSelecao', 'Deglutições na seleção automática', '', 1, ''],
+    ['volUmidaPadrao', 'Volume padrão da deglutição úmida', 'mL', 1, 'Atribuído às marcações DUm do Multiplex; ajuste por deglutição na Avaliação.'],
+    ['segHipo', 'Hipofaringe: até (acima do ápice)', 'cm', 0.5, 'Segmento hipofaríngeo começa 1 cm acima do ápice do ESE.'],
+    ['segMeso', 'Mesofaringe: até', 'cm', 0.5, ''], ['segVelo', 'Velofaringe: até', 'cm', 0.5, ''],
     ['escalaMin', 'Escala de cores: mínimo', 'mmHg', 5, ''],
     ['escalaMax', 'Escala de cores: máximo', 'mmHg', 10, '']
   ];
@@ -410,7 +414,9 @@
   var CAMPOS_REF = [['repousoMin', 'Pressão basal (máx. repouso) — mínimo', 'mmHg'], ['repousoMax', 'Pressão basal (máx. repouso) — máximo', 'mmHg'], ['repMedMin', 'Pressão de repouso média — mínimo', 'mmHg'], ['repMedMax', 'Pressão de repouso média — máximo', 'mmHg'], ['residualMax', 'Pressão residual (0,2 s) — máximo', 'mmHg'],
     ['aberturaMin', 'Tempo de abertura — mínimo', 's'], ['aberturaMax', 'Tempo de abertura — máximo', 's'], ['extMin', 'Extensão — mínimo', 'cm'], ['extMax', 'Extensão — máximo', 'cm'],
     ['faringeMin', 'Contração faríngea — mínimo', 'mmHg'], ['faringeMax', 'Contração faríngea — máximo', 'mmHg'], ['posMin', 'Contração pós-deglutição — mínimo', 'mmHg'], ['posMax', 'Contração pós-deglutição — máximo', 'mmHg'],
-    ['phciMin', 'Integral contrátil faríngea — mínimo', 'mmHg·cm·s'], ['phciMax', 'Integral contrátil faríngea — máximo', 'mmHg·cm·s']];
+    ['phciMin', 'Integral contrátil faríngea — mínimo', 'mmHg·cm·s'], ['phciMax', 'Integral contrátil faríngea — máximo', 'mmHg·cm·s'],
+    ['lvIrpMax', 'Leuven · UES IRP — máximo normal', 'mmHg'], ['lvIbpMax', 'Leuven · IBP hipofaríngea — máximo normal', 'mmHg'], ['lvRtMin', 'Leuven · UES RT — mínimo normal', 's'],
+    ['lvAusenteMax', 'Leuven · contração AUSENTE se pico <', 'mmHg'], ['lvBaixoMin', 'Leuven · contração BAIXA se pico <', 'mmHg'], ['lvAltoMax', 'Leuven · contração ALTA se pico >', 'mmHg']];
   function renderRefs() {
     var r = E.cfg.refs;
     $('#selPreset').innerHTML = Object.keys(PRESETS_REF).map(function (k) { return '<option value="' + k + '"' + (k === E.cfg.refPreset ? ' selected' : '') + '>' + PRESETS_REF[k].nome + '</option>'; }).join('');
@@ -543,4 +549,5 @@
   ligar();
   irPara('exame');
   window.__ESE = E; // depuração
+  Avaliacao.ligar(E, { reprocessar: reprocessar, toast: toast, desenharDetalhe: desenharDetalhe, irPara: irPara });
 })();

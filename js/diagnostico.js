@@ -44,11 +44,11 @@ var Diagnostico = (function () {
 
     // Relaxamento
     var semAb = sel.filter(function (s) { return s.semAbertura; }).length;
-    var irp = it('irp02'), ab = it('tAbertura');
+    var ab = it('tAbertura'), irpLv = Analise.estat(sel.map(function (s) { return s.leuven ? s.leuven.irp : null; })), irp = { cls: 'normal' }; // classificação do relaxamento pelos critérios de Leuven fica na aba Avaliação ESE
     var relax;
     if (semAb === n) relax = 'ausência de relaxamento do ESE nas deglutições analisadas';
-    else if (irp.cls === 'alto') relax = 'relaxamento incompleto do ESE (pressão residual elevada)';
-    else relax = 'relaxamento completo do ESE às deglutições';
+    else if (irp.cls === 'alto') relax = 'pressão de relaxamento do ESE elevada (UES IRP mediana ' + fmt(irpLv.mediana, 1) + ' mmHg; ver Avaliação especializada para os critérios de Leuven)';
+    else relax = 'relaxamento do ESE presente às deglutições (UES IRP mediana ' + fmt(irpLv.mediana, 1) + ' mmHg; classificação pelos critérios de Leuven na aba Avaliação ESE)';
     if (semAb && semAb < n) relax += ' (' + semAb + ' de ' + n + ' sem abertura identificada)';
     achados.push(cap(relax) + '.');
     if (ab.cls === 'baixo') achados.push('Tempo de abertura do ESE reduzido (' + fmt(ab.e.media, 2) + ' s).');
@@ -97,7 +97,7 @@ var Diagnostico = (function () {
       if (rep.cls === 'baixo') partes.push('ESE hipotônico');
       if (rep.cls === 'alto') partes.push('ESE hipertônico');
       if (semAb === n) partes.push('ausência de relaxamento do ESE');
-      else if (irp.cls === 'alto') partes.push('relaxamento incompleto do ESE');
+      else if (irp.cls === 'alto') partes.push('pressão de relaxamento do ESE elevada');
       if (coord === 'incoordenação') partes.push('incoordenação faringoesofágica');
       if (far.cls === 'baixo') partes.push('contração faríngea fraca');
       conc = 'Estudo manométrico do ESE com ' + juntar(partes) + '. Sugere-se correlação clínica e, se indicado, avaliação fonoaudiológica complementar (FEES ou videofluoroscopia da deglutição).';

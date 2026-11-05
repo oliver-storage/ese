@@ -50,6 +50,8 @@ var Exportar = (function () {
     XLSX.utils.book_append_sheet(wb, s1, 'Resumo');
     XLSX.utils.book_append_sheet(wb, s2, 'Deglutições');
     XLSX.utils.book_append_sheet(wb, s3, 'Configuração');
+    var t = document.getElementById('avTexto'), txt = t ? t.value : (E.av && E.av.texto) || (E.avUltimo && E.avUltimo.gerado) || '';
+    if (txt) { var s4 = XLSX.utils.aoa_to_sheet(txt.split('\n').map(function (l) { return [l]; })); s4['!cols'] = [{ wch: 140 }]; XLSX.utils.book_append_sheet(wb, s4, 'Laudo especializado'); }
     XLSX.writeFile(wb, nomeBase(E) + '.xlsx');
   }
 

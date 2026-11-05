@@ -181,6 +181,8 @@ var Analise = (function () {
     out.picoPos = pp.v; out.tPicoPos = pp.t; out.zPicoPos = pp.z;
     out.uesci = integral(g, zPosTop, zPosBot, pa, pb, cfg.limiarIntegral, fs);
 
+    leuven(g, out, abertura, cfg, fs);
+
     // artefato: pressão alta simultânea em >= 70% dos canais (tosse/esforço)
     if (todosCanais) {
       var a3 = Math.round(abertura.i - 1 * fs), b3 = Math.round(abertura.f + 2 * fs), cont = 0;
@@ -188,6 +190,69 @@ var Analise = (function () {
       if (cont >= todosCanais.length * 0.7) { out.artefato = true; out.flags.push('Possível artefato (tosse/esforço)'); }
     }
     return out;
+  }
+
+  /* Métricas no padrão do Consenso de Leuven (2025/2026), adaptadas a manometria sem impedância */
+  function mediana(v) { var s = Array.prototype.slice.call(v).filter(isFinite).sort(function (a, b) { return a - b; }); if (!s.length) return null; var n = s.length; return n % 2 ? s[(n - 1) / 2] : (s[n / 2 - 1] + s[n / 2]) / 2; }
+  function leuven(g, out, ab, cfg, fs) {
+    var L = out.leuven = {};
+    var c = out.centro;
+    // linha de base do e-sleeve (repouso pré-deglutição)
+    var ra = Math.round(ab.i + cfg.repIni * fs), rb = Math.round(ab.i + cfg.repFim * fs);
+    var base = mediana(sleeve(g, c, cfg, ra, rb)) || 0;
+    L.base = base;
+    // UES RT: intervalo com e-sleeve abaixo de 50% da linha de base ou 35 mmHg (o que for menor)
+    var thr = Math.min(0.5 * base, 35); L.limiarRT = thr;
+    var wa = Math.round(ab.i - 1.0 * fs), wb = Math.round(ab.f + 1.0 * fs);
+    var s = sleeve(g, c, cfg, wa, wb), a0 = Math.max(0, wa);
+    var kMin = 0; for (var k = 0; k < s.length; k++) if (s[k] < s[kMin]) kMin = k;
+    // nadir deve cair dentro (ou perto) da abertura
+    var kAb = Math.round((ab.ti + ab.tf) / 2) - a0; if (kAb >= 0 && kAb < s.length && Math.abs(kAb - kMin) > 0.8 * fs) kMin = Math.max(0, Math.min(s.length - 1, kAb));
+    if (s[kMin] < thr) {
+      var gap = Math.max(1, Math.round(0.1 * fs)), i = kMin, j = kMin, q2;
+      for (;;) { while (i > 0 && s[i - 1] < thr) i--; q2 = i - 1; while (q2 >= 0 && i - q2 <= gap && s[q2] >= thr) q2--; if (q2 >= 0 && i - q2 <= gap && s[q2] < thr) i = q2; else break; }
+      for (;;) { while (j < s.length - 1 && s[j + 1] < thr) j++; q2 = j + 1; while (q2 < s.length && q2 - j <= gap && s[q2] >= thr) q2++; if (q2 < s.length && q2 - j <= gap && s[q2] < thr) j = q2; else break; }
+      var ti = i > 0 ? i - (thr - s[i]) / (s[i - 1] - s[i]) : i, tf = j < s.length - 1 ? j + (thr - s[j]) / (s[j + 1] - s[j]) : j;
+      L.rt = (tf - ti) / fs; L.rtIni = ti + a0; L.rtFim = tf + a0; L.rtI = i + a0; L.rtF = j + a0;
+    } else { L.rt = 0; L.rtIni = L.rtFim = kMin + a0; L.rtI = L.rtF = kMin + a0; }
+    // UES IRP: mediana das menores amostras não consecutivas que somem 0,25 s, dentro da janela de relaxamento
+    var n = Math.max(1, Math.round(0.25 * fs));
+    var ja = Math.max(0, L.rtI - Math.round(0.25 * fs)) - a0, jb = Math.min(s.length - 1, L.rtF + Math.round(0.25 * fs) - a0);
+    var v = []; for (var q = Math.max(0, ja); q <= Math.max(ja, jb); q++) v.push(s[q]);
+    v.sort(function (x, y) { return x - y; });
+    L.irp = mediana(v.slice(0, n));
+    // Ápice do ESE (posição mais proximal da zona de alta pressão no fechamento) ~ topo da banda
+    var apice = Math.min(g.zTop, c + cfg.bandaAcima); L.apice = apice;
+    // IBP estimada: 1 cm acima do ápice, mediana nos primeiros 60% do RT (antes da onda de clareamento)
+    var zI = apice + 1;
+    if (zI <= g.zTop + 1e-6 && L.rt > 0) {
+      var r = rowDe(g, zI), lin = g.linhas[r];
+      var e1 = Math.round(L.rtI + 0.6 * (L.rtF - L.rtI)); if (e1 <= L.rtI) e1 = L.rtI + 1;
+      L.ibp = mediana(lin.subarray(L.rtI, e1 + 1));
+      L.hipoBase = mediana(lin.subarray(Math.max(0, ra), Math.max(ra + 1, rb)));
+      L.pressurizacao = L.ibp != null && L.hipoBase != null && L.ibp - L.hipoBase > 20;
+      L.zIbp = zI;
+    } else { L.ibp = null; L.pressurizacao = null; }
+    // Segmentos faríngeos (distância acima do ápice): hipo 1–4 cm, meso 4–7 cm, velo 7–10 cm
+    var segs = [['hipo', 1, cfg.segHipo || 4], ['meso', cfg.segHipo || 4, cfg.segMeso || 7], ['velo', cfg.segMeso || 7, cfg.segVelo || 10]];
+    var fa = Math.round(ab.i + cfg.farIni * fs), fb = Math.round(ab.f + cfg.farFim * fs);
+    L.seg = {};
+    segs.forEach(function (sg) {
+      var z0 = apice + sg[1], z1 = apice + sg[2];
+      var cob = Math.max(0, Math.min(z1, g.zTop) - z0) / (z1 - z0);
+      var o = { de: sg[1], ate: sg[2], cobertura: cob };
+      if (cob >= 0.5) {
+        var zt = Math.min(z1, g.zTop), r0 = rowDe(g, zt), r1 = rowDe(g, z0), picos = [], soma = 0, pmax = -1e9;
+        for (var rr = r0; rr <= r1; rr++) {
+          var Lr = g.linhas[rr], m = -1e9;
+          for (var t = Math.max(0, fa); t < Math.min(g.N, fb); t++) { if (Lr[t] > m) m = Lr[t]; soma += Math.max(0, Lr[t]); }
+          picos.push(m); if (m > pmax) pmax = m;
+        }
+        o.pico = pmax; o.picoMedio = picos.reduce(function (a, b) { return a + b; }, 0) / picos.length;
+        o.ci = soma / fs * DZ;
+      }
+      L.seg[sg[0]] = o;
+    });
   }
 
   /* Trechos com ESE presente na região (zona de alta pressão estável) */
@@ -288,7 +353,7 @@ var Analise = (function () {
       ajuda: 'Duração do hiato pressórico (pressão do ESE abaixo do contorno) durante a deglutição. O estudo encontrou média de 0,5 s. Abertura curta ou ausente sugere relaxamento/abertura prejudicados.' },
     { k: 'residual', nome: 'Pressão residual do ESE (média na abertura)', un: 'mmHg', dec: 1, ref: null,
       ajuda: 'Pressão média do ESE durante o hiato. Deve ser menor que as pressões de repouso da faringe e do esôfago superior. Elevada = relaxamento incompleto (ex.: barra do cricofaríngeo, Zenker, fase avançada de doenças neurológicas).' },
-    { k: 'irp02', nome: 'Pressão residual — menor média em 0,2 s', un: 'mmHg', dec: 1, ref: [null, 'residualMax'],
+    { k: 'irp02', nome: 'Pressão residual — menor média em 0,2 s', un: 'mmHg', dec: 1, ref: null,
       ajuda: 'Menor pressão média do ESE em uma janela contínua de 0,2 s (equivalente ao IRP 0,2 s dos sistemas solid state).' },
     { k: 'picoFar', nome: 'Pressão máxima de contração faríngea', un: 'mmHg', dec: 1, ref: ['faringeMin', 'faringeMax'],
       ajuda: 'Pico de pressão da faringe, acima da borda superior do ESE. Contração fraca é vista em síndromes neurológicas; aumentada no megaesôfago (Dantas e cols.).' },
