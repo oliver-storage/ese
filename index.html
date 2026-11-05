@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Análise ESE</title>
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="menu" id="menu">
+    <button class="menu-toggle" id="menuToggle" title="Recolher/expandir menu">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+    </button>
+    <div class="marca"><span class="marca-ico">ESE</span><span class="rot">Análise ESE</span></div>
+    <nav>
+      <a data-pg="exame" class="ativo" title="Exame"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></svg><span class="rot">Exame</span></a>
+      <a data-pg="sonda" title="Sonda e região"><svg viewBox="0 0 24 24"><path d="M12 2v20"/><circle cx="12" cy="6" r="1.6"/><circle cx="12" cy="10" r="1.6"/><circle cx="12" cy="14" r="1.6"/><path d="M9 18h6v3H9z"/></svg><span class="rot">Sonda e região</span></a>
+      <a data-pg="comp" title="Compensação postural"><svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2"/><path d="M12 7v7l-4 7M12 14l4 7M7 10h10"/></svg><span class="rot">Compensação postural</span></a>
+      <a data-pg="analise" title="Análise das deglutições"><svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 5-7"/></svg><span class="rot">Análise</span></a>
+      <a data-pg="laudo" title="Laudo e planilha"><svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><rect x="4" y="3" width="16" height="18" rx="2"/></svg><span class="rot">Laudo e planilha</span></a>
+      <a data-pg="refs" title="Valores de referência"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15v-4M12 15V8M16 15v-6"/></svg><span class="rot">Referências</span></a>
+      <a data-pg="ajuda" title="Como usar / glossário"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.3-1 .8-1 1.5V14M12 17.5v.01"/></svg><span class="rot">Como usar</span></a>
+    </nav>
+  </aside>
+
+  <main class="conteudo">
+    <header class="topo">
+      <div>
+        <h1 id="tituloPg">Exame</h1>
+        <div class="sub" id="subTopo">Abra um exame (.mpx do Multiplex ou .txt exportado)</div>
+      </div>
+      <div class="topo-acoes">
+        <label class="btn primario"><input type="file" id="arquivo" accept=".mpx,.txt,.csv" hidden>Abrir exame</label>
+      </div>
+    </header>
+
+    <!-- EXAME -->
+    <section class="pg ativa" id="pg-exame">
+      <div class="vazio" id="exameVazio">
+        <div class="drop" id="drop">
+          <svg viewBox="0 0 24 24"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+          <b>Arraste o arquivo do exame aqui</b>
+          <span>.mpx (Multiplex/Alacer) ou .txt / .csv exportado — o arquivo é lido só no seu computador, nada é enviado.</span>
+        </div>
+      </div>
+      <div id="exameInfo" hidden>
+        <div class="cards" id="cardsExame"></div>
+        <div class="card">
+          <div class="card-tit">Exame completo <span class="dica">Linhas cinza: limites da região analisada. Marcas no topo: deglutições marcadas no Multiplex.</span></div>
+          <div class="mapa-wrap"><canvas id="cvGeral"></canvas></div>
+        </div>
+        <div class="grid2">
+          <div class="card"><div class="card-tit">Eventos do arquivo</div><div id="listaEventos" class="lista-eventos"></div></div>
+          <div class="card"><div class="card-tit">Laudo gravado no Multiplex</div><div id="laudoOriginal" class="laudo-orig"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SONDA -->
+    <section class="pg" id="pg-sonda">
+      <div class="card">
+        <div class="card-tit">Região de análise do ESE</div>
+        <div class="opcoes" id="optRegiao">
+          <label class="opc"><input type="radio" name="regiao" value="proximal"><b>Cluster proximal</b><span>Exame padrão: ESE nos canais proximais (1 cm entre canais).</span></label>
+          <label class="opc"><input type="radio" name="regiao" value="esleeve"><b>E-sleeve distal na retirada</b><span>Protocolo do estudo: ao final, sonda tracionada com o E-sleeve de 7 cm no cricofaríngeo, paciente sentado.</span></label>
+          <label class="opc"><input type="radio" name="regiao" value="custom"><b>Personalizada</b><span>Marque os canais na tabela abaixo.</span></label>
+        </div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-tit">Canais da sonda <span class="dica">Posição = distância (cm) a partir da ponta distal. Edite se sua sonda for diferente.</span></div>
+          <div class="linha-form">
+            <label>Sonda <select id="selSonda"></select></label>
+            <label>Amostragem <input type="number" id="inpFs" step="0.1" min="1"> Hz</label>
+            <button class="btn" id="btnPosArquivo">Usar posições do arquivo</button>
+          </div>
+          <div class="tabela-rol"><table class="tab" id="tabCanais"><thead><tr><th>Canal</th><th>Posição (cm)</th><th>Na região</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card">
+          <div class="card-tit">Parâmetros de medida</div>
+          <div class="form-grid" id="formParam"></div>
+          <div class="linha-form"><button class="btn" id="btnParamPadrao">Restaurar padrões</button></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- COMPENSAÇÃO -->
+    <section class="pg" id="pg-comp">
+      <div class="card">
+        <div class="card-tit">Compensação da mudança de posição</div>
+        <p class="texto">No sistema de perfusão o zero é o intragástrico. Ao elevar o paciente, cada canal muda de altura em relação aos transdutores e a pressão lida muda pela coluna líquida. Escolha como tratar:</p>
+        <div class="opcoes" id="optComp">
+          <label class="opc"><input type="radio" name="comp" value="nenhuma"><b>Nenhuma</b><span>Paciente deitado (0°) durante a captação.</span></label>
+          <label class="opc"><input type="radio" name="comp" value="arquivo"><b>Já compensado no Multiplex</b><span>A ferramenta do Multiplex já aplicou a correção (graus informados no exame). Os dados são usados como estão.</span></label>
+          <label class="opc"><input type="radio" name="comp" value="hidrostatica"><b>Hidrostática automática</b><span>Correção = sinal × coeficiente × altura do canal acima do zero × seno(ângulo).</span></label>
+          <label class="opc"><input type="radio" name="comp" value="janela"><b>Zerar por janela atmosférica</b><span>Zera cada canal pela mediana de um trecho com a sonda fora do paciente / no ar.</span></label>
+        </div>
+        <div class="form-grid" id="formComp"></div>
+        <div class="aviso" id="avisoComp" hidden></div>
+      </div>
+      <div class="card">
+        <div class="card-tit">Verificação <span class="dica">Na faringe em repouso a pressão deve ficar perto de 0 mmHg (atmosférica). Use para conferir sinal e coeficiente.</span></div>
+        <div id="verifComp"></div>
+      </div>
+    </section>
+
+    <!-- ANÁLISE -->
+    <section class="pg" id="pg-analise">
+      <div class="barra-ferr">
+        <div class="seg" id="segFonte" title="Como as deglutições são encontradas">
+          <span class="seg-rot">Deglutições</span>
+          <button data-v="auto">Automática</button><button data-v="marcadores">Marcadores do arquivo</button><button data-v="manual">Manual (clique no mapa)</button>
+        </div>
+        <div class="seg" id="segSel" title="Quais deglutições entram no cálculo">
+          <span class="seg-rot">Seleção</span>
+          <button data-v="auto">3 mais representativas</button><button data-v="manual">Escolher</button>
+        </div>
+        <div class="seg" id="segTrecho" title="Parte do exame analisada">
+          <span class="seg-rot">Trecho</span>
+          <button data-v="auto">Automático</button><button data-v="manual">Arrastar no mapa</button><button data-v="tudo">Exame todo</button>
+        </div>
+      </div>
+      <div class="aviso" id="avisoRegiao" hidden></div>
+      <div class="card">
+        <div class="card-tit">Região do ESE ao longo do exame <span class="dica" id="dicaVisao"></span></div>
+        <div class="mapa-wrap"><canvas id="cvVisao"></canvas></div>
+      </div>
+      <div class="grid-analise">
+        <div class="card">
+          <div class="card-tit">Deglutições <span class="dica" id="contDeg"></span></div>
+          <div class="tabela-rol alta"><table class="tab clic" id="tabDeg"><thead><tr><th>Usar</th><th>#</th><th>Tempo</th><th>Repouso</th><th>Abertura</th><th>Residual</th><th>Faringe</th><th>Coord.</th><th>Obs.</th></tr></thead><tbody></tbody></table></div>
+        </div>
+        <div class="card" id="cardDet">
+          <div class="card-tit"><span id="titDet">Deglutição</span>
+            <span class="acoes-mini">
+              <button class="btn mini" id="btnAnt" title="Anterior">‹</button>
+              <button class="btn mini" id="btnProx" title="Próxima">›</button>
+              <button class="btn mini" id="btnAjAb" title="Clique no início e no fim do hiato no mapa">Ajustar abertura</button>
+              <button class="btn mini" id="btnAjCentro" title="Clique na altura do centro do ESE no mapa">Definir centro</button>
+              <button class="btn mini" id="btnRestaurar" title="Volta ao cálculo automático">Restaurar</button>
+              <button class="btn mini perigo" id="btnExcluir" title="Excluir (tosse, artefato, deglutição anômala)">Excluir</button>
+            </span>
+          </div>
+          <div class="aviso" id="avisoAjuste" hidden></div>
+          <div class="mapa-wrap"><canvas id="cvDet"></canvas></div>
+          <div class="mapa-wrap"><canvas id="cvCurva"></canvas></div>
+          <div class="legenda" id="legDet"></div>
+          <div class="metricas" id="metDet"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- LAUDO -->
+    <section class="pg" id="pg-laudo">
+      <div class="barra-ferr nao-imprimir">
+        <button class="btn primario" id="btnExcel">Exportar planilha (Excel)</button>
+        <button class="btn" id="btnCsv">Exportar CSV</button>
+        <button class="btn" id="btnImprimir">Imprimir / PDF</button>
+      </div>
+      <div id="laudoArea"></div>
+    </section>
+
+    <!-- REFERÊNCIAS -->
+    <section class="pg" id="pg-refs">
+      <div class="card">
+        <div class="card-tit">Valores de referência <span class="dica">Campo vazio = parâmetro só é medido, não classificado.</span></div>
+        <div class="linha-form"><label>Base <select id="selPreset"></select></label><button class="btn" id="btnAplicarPreset">Carregar base</button></div>
+        <div class="fonte" id="fontePreset"></div>
+        <div class="form-grid" id="formRefs"></div>
+        <p class="texto suave">Os valores ficam salvos neste navegador. Quando a casuística do estudo estiver fechada (média ± 2 DP ou p5–p95), preencha aqui.</p>
+      </div>
+    </section>
+
+    <!-- AJUDA -->
+    <section class="pg" id="pg-ajuda">
+      <div class="card texto" id="ajudaTxt"></div>
+    </section>
+
+    <footer class="rodape" id="rodape"></footer>
+  </main>
+</div>
+<div class="toast" id="toast"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="js/config.js"></script>
+<script src="js/leitores.js"></script>
+<script src="js/analise.js"></script>
+<script src="js/diagnostico.js"></script>
+<script src="js/graficos.js"></script>
+<script src="js/exportar.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
