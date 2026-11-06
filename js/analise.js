@@ -55,8 +55,10 @@ var Analise = (function () {
 
   /* Analisa o perfil de repouso: centro, bordas no contorno, extensão, pressões */
   function repouso(g, p, contorno) {
-    var rMax = 0;
-    for (var r = 1; r < p.length; r++) if (p[r] > p[rMax]) rMax = r;
+    var lo = 0, hi = p.length - 1;
+    if (g.zBusca) { lo = rowDe(g, g.zBusca[0]); hi = rowDe(g, g.zBusca[1]); }
+    var rMax = lo;
+    for (var r = lo + 1; r <= hi; r++) if (p[r] > p[rMax]) rMax = r;
     var res = { centro: g.z[rMax], max: p[rMax], rCentro: rMax };
     if (p[rMax] < contorno) { res.ext = 0; res.media = p[rMax]; res.sup = res.inf = g.z[rMax]; res.abaixoContorno = true; return res; }
     var a = rMax, b = rMax;
@@ -261,7 +263,8 @@ var Analise = (function () {
     for (var a = 0; a < g.N; a += bloco) {
       var b = Math.min(g.N, a + bloco), p = new Float32Array(g.linhas.length);
       for (var r = 0; r < p.length; r++) { var v = Array.prototype.slice.call(g.linhas[r], a, b).sort(function (x, y) { return x - y; }); p[r] = v[v.length >> 1]; }
-      var mx = 0, rm = 0; for (var r2 = 0; r2 < p.length; r2++) if (p[r2] > mx) { mx = p[r2]; rm = r2; }
+      var lo2 = g.zBusca ? rowDe(g, g.zBusca[0]) : 0, hi2 = g.zBusca ? rowDe(g, g.zBusca[1]) : p.length - 1;
+      var mx = 0, rm = lo2; for (var r2 = lo2; r2 <= hi2; r2++) if (p[r2] > mx) { mx = p[r2]; rm = r2; }
       // ESE: zona focal (pico bem maior que a mediana do perfil)
       var med = Array.prototype.slice.call(p).sort(function (x, y) { return x - y; })[p.length >> 1];
       ok.push(mx >= cfg.contorno * 0.6 && mx > med + 15 && rm > 0 && rm < p.length - 1);

@@ -53,6 +53,9 @@
     $('#subTopo').textContent = 'Lendo ' + arq.name + '…';
     Leitores.ler(arq).then(function (ex) {
       E.ex = ex; E.manuais = []; E.ajustes = {}; E.selManual = {}; E.atual = -1; E.av = null;
+      var hes = ex.eventos.filter(function (e) { return e.tipo === 'ese' && e.posSup; })[0];
+      E.loc = hes ? { modo: 'multiplex', marca: null } : { modo: 'sonda', marca: null };
+      if (hes) setTimeout(function () { toast('ESE localizado pela marcação do Multiplex (' + F(hes.posInf, 1) + '–' + F(hes.posSup, 1) + ' cm). Para corrigir, use “Marcar no mapa” em Análise.'); }, 600);
       montarCanaisCfg();
       processar();
       ex.avisos.forEach(function (a) { toast(a); });
@@ -83,11 +86,25 @@
     var base = { canais: ex.canais.map(function (c, i) { return { nome: c.nome, pos: E.canaisCfg[i].pos, dados: c.dados }; }), fs: ex.fs };
     var comp = cfg.comp.modo === 'arquivo' ? { modo: 'nenhuma' } : cfg.comp;
     E.canais = Analise.compensar(base, comp);
+    var fs = ex.fs, zona = zonaESE();
     var idx = E.canaisCfg.map(function (c, i) { return c.regiao ? i : -1; }).filter(function (i) { return i >= 0; });
-    if (idx.length < 3) { toast('Selecione pelo menos 3 canais na região de análise.', true); return; }
+    if (zona) {
+      var zMin = zona.zInf - cfg.posAbaixo - 1, zMax = zona.zSup + cfg.bandaAcima + (cfg.farAfast || 0) + cfg.faringeAltura;
+      idx = E.canaisCfg.map(function (c, i) { return c.pos >= zMin - 1e-6 && c.pos <= zMax + 1e-6 ? i : -1; }).filter(function (i) { return i >= 0; });
+    }
+    if (idx.length < 3) { toast('Região de análise com menos de 3 canais — marque uma área maior.', true); return; }
     E.g = Analise.grade(E.canais, idx);
-    var fs = ex.fs, N = E.g.N;
-    if (cfg.trechoModo === 'tudo') E.trechos = [[0, N]];
+    E.descRegiao = zona ? (E.loc.modo === 'mapa' ? 'ESE marcado manualmente no mapa' : 'ESE marcado no Multiplex') + ' (' + F(zona.zInf, 1) + '–' + F(zona.zSup, 1) + ' cm da ponta; análise ' + F(E.g.zBot, 1) + '–' + F(E.g.zTop, 1) + ' cm)'
+      : ({ proximal: 'cluster proximal', esleeve: 'E-sleeve distal na retirada', custom: 'canais selecionados' })[cfg.regiaoModo] + ' (' + F(E.g.zBot, 1) + '–' + F(E.g.zTop, 1) + ' cm da ponta)';
+    if (zona) E.g.zBusca = [Math.min(E.g.zTop, zona.zSup + 1), Math.max(E.g.zBot, zona.zInf - 1)];
+    var N = E.g.N;
+    if (zona && zona.t1 != null) E.trechos = [[Math.max(0, Math.round(zona.t0 * fs)), Math.min(N, Math.round(zona.t1 * fs))]];
+    else if (zona) {
+      var tm = zona.tRef * fs, bl = Analise.trechosAuto(E.g, cfg, fs).filter(function (t) { return t[0] - 5 * fs <= tm && t[1] + 5 * fs >= tm; });
+      E.trechos = bl.length ? [[Math.min(bl[0][0], Math.round(tm - 10 * fs)), bl[0][1]]] : [[Math.max(0, Math.round(tm - 60 * fs)), Math.min(N, Math.round(tm + 60 * fs))]];
+      E.trechos[0][0] = Math.max(0, E.trechos[0][0]);
+    }
+    else if (cfg.trechoModo === 'tudo') E.trechos = [[0, N]];
     else if (cfg.trechoModo === 'manual' && cfg.trechoFim > cfg.trechoIni) E.trechos = [[Math.round(cfg.trechoIni * fs), Math.round(cfg.trechoFim * fs)]];
     else E.trechos = Analise.trechosAuto(E.g, cfg, fs);
     if (!E.trechos.length) E.trechos = [[0, N]];
@@ -119,6 +136,14 @@
     E.aval = Diagnostico.avaliar(sel, E.lista, E.cfg.refs);
     var nome = ex.paciente || ex.arquivo;
     $('#subTopo').textContent = nome + ' — ' + E.lista.length + ' deglutições, ' + sel.length + ' selecionadas';
+  }
+  /* Zona do ESE: marcação do Multiplex ou retângulo desenhado no mapa */
+  function zonaESE() {
+    if (!E.loc || E.loc.modo === 'sonda') return null;
+    if (E.loc.modo === 'mapa') return E.loc.marca;
+    var h = E.ex.eventos.filter(function (e) { return e.tipo === 'ese' && e.posSup; })[0];
+    if (!h) return null;
+    return { zSup: h.posSup, zInf: h.posInf, tRef: (h.ini + h.fim) / 2 / E.ex.fs, t1: null };
   }
   var _deb;
   function reprocessar(render) { clearTimeout(_deb); _deb = setTimeout(function () { processar(); salvarCfg(); if (render !== false) renderPagina(); }, 120); }
@@ -241,24 +266,38 @@
   function renderAnalise() {
     $$('#segFonte button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === E.cfg.fonteDeg); });
     $$('#segSel button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === E.cfg.selecaoModo); });
-    $$('#segTrecho button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === E.cfg.trechoModo); });
+    var lm = E.loc ? E.loc.modo : 'sonda';
+    $$('#segLoc button').forEach(function (b) { b.classList.toggle('on', b.dataset.v === lm); });
+    $$('#segTrecho button').forEach(function (b) { b.classList.toggle('on', lm === 'sonda' && b.dataset.v === E.cfg.trechoModo); b.disabled = lm !== 'sonda'; });
     if (!E.ex) { $('#tabDeg tbody').innerHTML = '<tr><td colspan="9" class="suave">Abra um exame.</td></tr>'; return; }
-    var dica = E.cfg.fonteDeg === 'manual' ? 'Clique no mapa no momento de cada deglutição para adicioná-la (clique com Shift remove).' :
+    var dica = E.loc && E.loc.modo === 'mapa' && (!E.loc.marca || V.remarcar) ? 'Arraste um retângulo sobre o ESE (posição × tempo das deglutições).' : E.loc && E.loc.modo === 'mapa' ? 'Para remarcar o ESE, clique em “Marcar no mapa” de novo (ou arraste com Alt).' + (E.cfg.fonteDeg === 'manual' ? ' Clique para adicionar deglutição.' : '') : E.cfg.fonteDeg === 'manual' ? 'Clique no mapa no momento de cada deglutição para adicioná-la (clique com Shift remove).' :
       E.cfg.trechoModo === 'manual' ? 'Arraste no mapa para definir o trecho analisado.' : 'Clique numa deglutição para ver os detalhes.';
     $('#dicaVisao').textContent = dica;
     var ese = E.ex.eventos.filter(function (e) { return e.tipo === 'ese' && e.posSup; })[0], msg = '';
     if (ese && (ese.posSup < E.g.zBot || ese.posInf > E.g.zTop)) msg = 'O ESE marcado no Multiplex (' + F(ese.posInf, 1) + '–' + F(ese.posSup, 1) + ' cm) está fora da região analisada (' + F(E.g.zBot, 1) + '–' + F(E.g.zTop, 1) + ' cm). Confira a região em Sonda.';
-    if (E.cfg.regiaoModo === 'esleeve') msg = (msg ? msg + ' ' : '') + 'Modo E-sleeve: use só o trecho da retirada com o E-sleeve no cricofaríngeo (Trecho → Arrastar no mapa). No restante do exame o E-sleeve fica na junção esofagogástrica.';
+    if (E.loc && E.loc.modo !== 'sonda') msg = '';
+    else if (E.cfg.regiaoModo === 'esleeve') msg = (msg ? msg + ' ' : '') + 'Modo E-sleeve: use só o trecho da retirada com o E-sleeve no cricofaríngeo (Trecho → Arrastar no mapa). No restante do exame o E-sleeve fica na junção esofagogástrica.';
     var av = $('#avisoRegiao'); av.hidden = !msg; av.textContent = msg;
     desenharVisao(); renderTabDeg(); renderDetalhe();
   }
 
   var V = { area: null, a: 0, b: 0 };
   function desenharVisao() {
-    var cv = $('#cvVisao'), W = cv.parentNode.clientWidth, H = 200, ctx = Graficos.prepararCanvas(cv, W, H), g = E.g;
+    var cv = $('#cvVisao'), W = cv.parentNode.clientWidth, H = 300, ctx = Graficos.prepararCanvas(cv, W, H), g = E.g;
     var area = { x: 42, y: 12, w: W - 80, h: H - 32 }; V.area = area; V.a = 0; V.b = g.N;
-    Graficos.mapaCanais(ctx, g.canais, g.zTop, g.zBot, 0, g.N, area, { min: E.cfg.escalaMin, max: E.cfg.escalaMax });
-    Graficos.eixoZ(ctx, area, g.zTop, g.zBot, g.zTop - g.zBot > 12 ? 4 : 2); Graficos.eixoT(ctx, area, 0, g.N, E.ex.fs);
+    var cs = E.canais; V.zTop = Math.max.apply(null, cs.map(function (c) { return c.pos; })); V.zBot = Math.min.apply(null, cs.map(function (c) { return c.pos; }));
+    Graficos.mapaCanais(ctx, cs, V.zTop, V.zBot, 0, g.N, area, { min: E.cfg.escalaMin, max: E.cfg.escalaMax });
+    Graficos.eixoZ(ctx, area, V.zTop, V.zBot, 5); Graficos.eixoT(ctx, area, 0, g.N, E.ex.fs);
+    // fora da região analisada: escurece
+    ctx.fillStyle = 'rgba(15,23,42,.45)';
+    ctx.fillRect(area.x, area.y, area.w, yDe(g.zTop) - area.y); ctx.fillRect(area.x, yDe(g.zBot), area.w, area.y + area.h - yDe(g.zBot));
+    var zn = zonaESE();
+    if (zn) {
+      var tA = zn.t1 != null ? zn.t0 * E.ex.fs : E.trechos[0][0], tB = zn.t1 != null ? zn.t1 * E.ex.fs : E.trechos[0][1];
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.setLineDash([6, 4]); ctx.strokeRect(xDe(tA), yDe(zn.zSup), xDe(tB) - xDe(tA), yDe(zn.zInf) - yDe(zn.zSup)); ctx.setLineDash([]);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.fillText('ESE', xDe(tA) + 4, yDe(zn.zSup) - 4);
+    }
+    if (V.ret) { ctx.strokeStyle = '#facc15'; ctx.lineWidth = 2; ctx.strokeRect(Math.min(V.ret[0], V.ret[2]), Math.min(V.ret[1], V.ret[3]), Math.abs(V.ret[2] - V.ret[0]), Math.abs(V.ret[3] - V.ret[1])); }
     Graficos.barraCores(ctx, area.x + area.w + 8, area.y, 10, area.h, { min: E.cfg.escalaMin, max: E.cfg.escalaMax });
     // fora do trecho: escurece
     ctx.fillStyle = 'rgba(15,23,42,.55)';
@@ -275,6 +314,8 @@
     });
   }
   function xDe(t) { return V.area.x + (t - V.a) / (V.b - V.a) * V.area.w; }
+  function yDe(z) { return V.area.y + (V.zTop - z) / (V.zTop - V.zBot) * V.area.h; }
+  function zDe(y) { return V.zTop - (y - V.area.y) / V.area.h * (V.zTop - V.zBot); }
   function tDe(x) { return V.a + (x - V.area.x) / V.area.w * (V.b - V.a); }
 
   function renderTabDeg() {
@@ -378,7 +419,7 @@
     var ex = E.ex, av = E.aval, sel = E.lista.filter(function (m) { return m.selecionada; }), fs = ex.fs;
     var h = '<div class="laudo"><h2>Análise manométrica do esfíncter superior do esôfago</h2>';
     h += '<div class="cab"><div><b>Paciente:</b> ' + esc(ex.paciente || '—') + '</div><div><b>Médico:</b> ' + esc(ex.medico || '—') + '</div><div><b>Indicação:</b> ' + esc(ex.indicacao || '—') + '</div><div><b>Arquivo:</b> ' + esc(ex.arquivo) + '</div>' +
-      '<div><b>Região:</b> ' + ({ proximal: 'cluster proximal', esleeve: 'E-sleeve distal (retirada)', custom: 'personalizada' })[E.cfg.regiaoModo] + ' (' + F(E.g.zBot, 1) + '–' + F(E.g.zTop, 1) + ' cm)</div>' +
+      '<div><b>Região:</b> ' + esc(E.descRegiao) + '</div>' +
       '<div><b>Compensação:</b> ' + ({ nenhuma: 'nenhuma', arquivo: 'aplicada no Multiplex', hidrostatica: 'hidrostática ' + E.cfg.comp.angulo + '°', janela: 'zero por janela' })[E.cfg.comp.modo] + '</div>' +
       '<div><b>Contorno isobárico:</b> ' + E.cfg.contorno + ' mmHg</div><div><b>Deglutições:</b> ' + sel.length + ' analisadas de ' + E.lista.length + ' (' + (E.cfg.selecaoModo === 'auto' ? 'seleção automática' : 'seleção manual') + ')</div></div>';
     h += '<h3>Impressão diagnóstica sugerida</h3><div class="conc" contenteditable="true" id="concEdit">' + esc(E.conclusaoEditada || av.conclusao) + '</div>';
@@ -431,6 +472,7 @@
       '<li><b>Abrir exame</b> — .mpx do Multiplex (lido direto) ou .txt/.csv exportado. Nada sai do computador.</li>' +
       '<li><b>Sonda e região</b> — escolha onde está o ESE: <i>cluster proximal</i> (exame padrão) ou <i>E-sleeve distal</i> (protocolo do estudo, retirada da sonda com paciente sentado). Ajuste posições dos canais se a sonda for outra.</li>' +
       '<li><b>Compensação postural</b> — informe se o paciente estava deitado, se o Multiplex já compensou, ou aplique a correção hidrostática pelo ângulo.</li>' +
+      '<li><b>Localização do ESE</b> — por padrão usa o ESE marcado no Multiplex (quando o arquivo tem). Se estiver errado (ex.: pressão da mão do técnico segurando a sonda), clique em <i>Marcar no mapa</i> e arraste um retângulo sobre o ESE: a altura define a posição e a largura define o trecho com as deglutições.</li>' +
       '<li><b>Análise</b> — deglutições encontradas de forma automática, pelos marcadores do Multiplex ou clicando no mapa. Escolha as 3 mais representativas automaticamente ou marque à mão. Ajuste abertura e centro do ESE quando necessário; exclua tosse, deglutições sequenciais e artefatos.</li>' +
       '<li><b>Laudo e planilha</b> — impressão diagnóstica sugerida (editável), tabela de médias/medianas/DP e exportação para Excel.</li></ol>' +
       '<h3>Como ler o mapa</h3><p>Eixo vertical: posição na sonda (cm a partir da ponta; para cima = faringe). Eixo horizontal: tempo (zero = início da abertura do ESE). Cores: pressão (azul baixa, vermelho/roxo alta). A linha preta é o contorno isobárico de 30 mmHg; o ESE em repouso aparece como faixa quente horizontal e “some” (hiato) durante a abertura.</p>' +
@@ -485,6 +527,12 @@
     // Análise
     $('#segFonte').onclick = function (e) { var v = e.target.dataset.v; if (!v) return; E.cfg.fonteDeg = v; E.atual = -1; reprocessar(); };
     $('#segSel').onclick = function (e) { var v = e.target.dataset.v; if (!v) return; if (v === 'manual' && E.cfg.selecaoModo === 'auto') E.lista.forEach(function (m) { if (m.selecionada) E.selManual[m.chave] = true; }); E.cfg.selecaoModo = v; reprocessar(); };
+    $('#segLoc').onclick = function (e) {
+      var v = e.target.dataset.v; if (!v || !E.ex) return;
+      if (v === 'multiplex' && !E.ex.eventos.some(function (x) { return x.tipo === 'ese' && x.posSup; })) { toast('Este arquivo não tem o ESE marcado no Multiplex.', true); return; }
+      if (v === 'mapa') { V.remarcar = true; toast('Arraste um retângulo no mapa sobre o ESE: altura = posição do ESE, largura = trecho com as deglutições.'); }
+      E.loc.modo = v; E.ajustes = {}; E.atual = -1; reprocessar();
+    };
     $('#segTrecho').onclick = function (e) { var v = e.target.dataset.v; if (!v) return; E.cfg.trechoModo = v; if (v === 'manual') { toast('Arraste no mapa para definir o trecho.'); } reprocessar(); };
     $('#tabDeg').onclick = function (e) {
       if (e.target.dataset.sel != null) { var m = E.lista[+e.target.dataset.sel]; if (e.target.checked) E.selManual[m.chave] = true; else delete E.selManual[m.chave]; reprocessar(); return; }
@@ -501,7 +549,8 @@
     cvV.onmousedown = function (e) {
       if (!E.ex || !V.area) return;
       var x = e.offsetX;
-      if (E.cfg.trechoModo === 'manual') { V.arrasto = [x, x]; return; }
+      if (E.loc && E.loc.modo === 'mapa' && (!E.loc.marca || e.altKey || V.remarcar)) { V.ret = [x, e.offsetY, x, e.offsetY]; return; }
+      if (E.cfg.trechoModo === 'manual' && (!E.loc || E.loc.modo === 'sonda')) { V.arrasto = [x, x]; return; }
       var t = Math.round(tDe(x));
       if (E.cfg.fonteDeg === 'manual') {
         if (e.shiftKey) { var k = maisProx(t); if (k >= 0 && Math.abs(E.lista[k].abIni - t) < 3 * E.ex.fs) { var ch = E.lista[k].chave; E.manuais = E.manuais.filter(function (q) { return q !== ch; }); } }
@@ -510,8 +559,16 @@
       }
       var i = maisProx(t); if (i >= 0) { E.atual = i; desenharVisao(); renderTabDeg(); renderDetalhe(); }
     };
-    cvV.onmousemove = function (e) { if (V.arrasto) { V.arrasto[1] = e.offsetX; desenharVisao(); } };
+    cvV.onmousemove = function (e) { if (V.ret) { V.ret[2] = e.offsetX; V.ret[3] = e.offsetY; desenharVisao(); return; } if (V.arrasto) { V.arrasto[1] = e.offsetX; desenharVisao(); } };
     window.addEventListener('mouseup', function () {
+      if (V.ret) {
+        var r = V.ret; V.ret = null; V.remarcar = false;
+        var t0 = tDe(Math.min(r[0], r[2])) / E.ex.fs, t1 = tDe(Math.max(r[0], r[2])) / E.ex.fs, zS = zDe(Math.min(r[1], r[3])), zI = zDe(Math.max(r[1], r[3]));
+        if (t1 - t0 < 5 || zS - zI < 0.5) { toast('Área muito pequena: arraste cobrindo o ESE (≥ 0,5 cm) e o tempo das deglutições (≥ 5 s).', true); desenharVisao(); return; }
+        E.loc.marca = { t0: Math.max(0, t0), t1: t1, zSup: zS, zInf: zI }; E.ajustes = {}; E.atual = -1;
+        toast('ESE marcado: ' + F(zI, 1) + '–' + F(zS, 1) + ' cm, ' + Graficos.rotTempo(t0) + ' a ' + Graficos.rotTempo(t1) + '.');
+        reprocessar(); return;
+      }
       if (!V.arrasto) return;
       var a = tDe(Math.min(V.arrasto[0], V.arrasto[1])), b = tDe(Math.max(V.arrasto[0], V.arrasto[1])); V.arrasto = null;
       if (b - a > 5 * E.ex.fs) { E.cfg.trechoIni = Math.max(0, a / E.ex.fs); E.cfg.trechoFim = b / E.ex.fs; E.atual = -1; reprocessar(); } else desenharVisao();

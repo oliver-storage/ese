@@ -109,6 +109,10 @@
     <!-- ANÁLISE -->
     <section class="pg" id="pg-analise">
       <div class="barra-ferr">
+        <div class="seg" id="segLoc" title="Onde está o ESE no exame">
+          <span class="seg-rot">Localização do ESE</span>
+          <button data-v="multiplex">Marcado no Multiplex</button><button data-v="mapa">Marcar no mapa</button><button data-v="sonda">Região da sonda</button>
+        </div>
         <div class="seg" id="segFonte" title="Como as deglutições são encontradas">
           <span class="seg-rot">Deglutições</span>
           <button data-v="auto">Automática</button><button data-v="marcadores">Marcadores do arquivo</button><button data-v="manual">Manual (clique no mapa)</button>
@@ -117,7 +121,7 @@
           <span class="seg-rot">Seleção</span>
           <button data-v="auto">3 mais representativas</button><button data-v="manual">Escolher</button>
         </div>
-        <div class="seg" id="segTrecho" title="Parte do exame analisada">
+        <div class="seg" id="segTrecho" title="Parte do exame analisada (só em “Região da sonda”)">
           <span class="seg-rot">Trecho</span>
           <button data-v="auto">Automático</button><button data-v="manual">Arrastar no mapa</button><button data-v="tudo">Exame todo</button>
         </div>

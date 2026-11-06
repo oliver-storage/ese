@@ -263,8 +263,7 @@ var Avaliacao = (function () {
     var eat = eatTotal(); if (eat != null) L.push('EAT-10: ' + eat + (eat >= 3 ? ' (alterado, ≥ 3)' : ' (< 3)') + '.' + (cl.fois ? ' FOIS: ' + cl.fois + '.' : ''));
     L.push('');
     L.push('TÉCNICA');
-    L.push('Sistema de perfusão com ' + ex.canais.length + ' canais (' + (SONDAS[cfg.sonda] ? SONDAS[cfg.sonda].nome : 'sonda configurada') + '), amostragem ' + F(ex.fs, 0) + ' Hz. Região analisada: ' +
-      ({ proximal: 'cluster proximal', esleeve: 'E-sleeve distal posicionado no cricofaríngeo durante a retirada', custom: 'canais selecionados' })[cfg.regiaoModo] + ' (' + F(E.g.zBot, 1) + '–' + F(E.g.zTop, 1) + ' cm da ponta).');
+    L.push('Sistema de perfusão com ' + ex.canais.length + ' canais (' + (SONDAS[cfg.sonda] ? SONDAS[cfg.sonda].nome : 'sonda configurada') + '), amostragem ' + F(ex.fs, 0) + ' Hz. Região analisada: ' + E.descRegiao + '.');
     L.push('Data do exame: ' + (av.tec.dataExame || 'não informada') + '. ESE a ' + (av.tec.profNarina ? av.tec.profNarina + ' cm da narina' : '— cm da narina (não informado)') + '. Tolerância: ' + (av.tec.tolerancia || 'não informada') + '.');
     L.push('Posição: ' + (av.tec.posicao || 'não informada') + '. Tratamento postural: ' + ({ nenhuma: 'sem compensação', arquivo: 'compensação postural aplicada no software do equipamento', hidrostatica: 'paciente a ' + cfg.comp.angulo + '°, com compensação hidrostática', janela: 'zero por janela atmosférica' })[cfg.comp.modo] + '. Contorno isobárico de referência: ' + cfg.contorno + ' mmHg.');
     var vols = {}; v.forEach(function (m) { var b = bolusDe(m); var k = b.vol == null ? 'volume não informado' : b.cons === 'seca' ? 'seca' : b.vol + ' mL' + (b.cons && b.cons !== '0' ? ' IDDSI ' + b.cons : ' líquido fino'); vols[k] = (vols[k] || 0) + 1; });
